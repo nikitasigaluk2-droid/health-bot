@@ -1,0 +1,2117 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Здоровье-бот</title>
+<style>
+  :root {
+    --bg: #fdeee3;
+    --card-bg: #ffffff;
+    --text: #3d2b1f;
+    --muted: #a68a73;
+    --track: #f5e0d0;
+    --accent: #e76f51;
+    --divider: rgba(0,0,0,0.06);
+    --steps-accent: #3498db;
+  }
+  [data-theme="dark"] {
+    --bg: #2b2a28;
+    --card-bg: #3a3836;
+    --text: #f5f5f5;
+    --muted: #c9a98f;
+    --track: #4a4540;
+    --divider: rgba(255,255,255,0.1);
+    --steps-accent: #4aa3df;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    max-width: 420px;
+    margin: 0 auto;
+    min-height: 100vh;
+    padding: 16px;
+    padding-top: 72px;
+    padding-bottom: 84px;
+    transition: background 0.3s ease;
+  }
+
+  .icon-btn {
+    position: fixed;
+    top: 12px;
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--card-bg);
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(231, 111, 81, 0.2);
+    z-index: 200;
+    padding: 0;
+    transition: transform 0.2s ease;
+  }
+  .icon-btn:hover { transform: scale(1.1); }
+  .icon-btn:active { transform: scale(0.95); }
+  #themeBtn { left: max(12px, calc(50% - 198px)); }
+  #settingsBtn { right: max(12px, calc(50% - 198px)); }
+  #achievementsBtn { left: max(12px, calc(50% - 198px)); top: 64px; }
+
+  .char {
+    text-align: center;
+    padding: 16px;
+    background: var(--card-bg);
+    border-radius: 24px;
+    box-shadow: 0 4px 15px rgba(255, 160, 120, 0.25);
+    margin-bottom: 16px;
+  }
+
+  .blob {
+    width: 84px; height: 84px;
+    margin: 0 auto;
+    background: linear-gradient(145deg, #f4a261, #e76f51);
+    border-radius: 42% 42% 48% 48%;
+    position: relative;
+    animation: bob var(--bob-speed, 3s) ease-in-out infinite;
+    box-shadow: inset -6px -8px 0 rgba(0,0,0,0.06), 0 6px 12px rgba(231,111,81,0.25);
+  }
+  .eye {
+    position: absolute; top: 26px; width: 10px; height: 14px;
+    background: #fff; border: 1px solid #3d2b1f; border-radius: 50%;
+    overflow: hidden;
+    animation: blink 4.2s infinite;
+  }
+  .eye.left { left: 22px; }
+  .eye.right { right: 22px; }
+  .pupil {
+    position: absolute; top: 50%; left: 50%;
+    width: 6px; height: 6px;
+    background: #3d2b1f; border-radius: 50%;
+    transform: translate(-50%, -50%);
+    will-change: transform;
+  }
+  .mouth {
+    position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
+    width: 22px; height: 10px; background: #3d2b1f;
+    border-radius: 0 0 12px 12px;
+    transition: all 0.25s ease;
+  }
+  .blob.happy .mouth, .mini-blob.happy .mini-mouth {
+    width: 34px; height: 16px; border-radius: 0 0 20px 20px;
+  }
+  .blob.think .mouth, .mini-blob.think .mini-mouth {
+    width: 16px; height: 6px; border-radius: 6px; transform: translateX(-85%);
+  }
+  .blob.wow .mouth, .mini-blob.wow .mini-mouth {
+    width: 14px; height: 18px; border-radius: 50%;
+  }
+  .blob.think .eye { animation-duration: 2.4s !important; }
+  .blob.sleep .eye { height: 3px; border-radius: 2px; top: 32px; animation: none; }
+  .blob.sleep .pupil { display: none; }
+  .blob.sleep .mouth, .mini-blob.sleep .mini-mouth {
+    width: 12px; height: 14px; border-radius: 50%;
+  }
+  .blob.celebrate .mouth, .mini-blob.celebrate .mini-mouth {
+    width: 38px; height: 20px; border-radius: 0 0 24px 24px;
+  }
+  .blob.celebrate { animation: bounce 0.6s ease; }
+
+  .nightcap {
+    position: absolute; top: -14px; left: 12px;
+    width: 40px; height: 22px;
+    background: #6c5ce7;
+    border-radius: 20px 20px 0 0;
+    transform: rotate(-18deg);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .nightcap::after {
+    content: ""; position: absolute; right: -8px; top: 12px;
+    width: 10px; height: 10px; background: #f1c40f; border-radius: 50%;
+  }
+  .blob.sleepy .nightcap, .mini-blob.sleepy .mini-nightcap { opacity: 1; }
+  .mini-nightcap {
+    position: absolute; top: -7px; left: 6px;
+    width: 20px; height: 11px;
+    background: #6c5ce7;
+    border-radius: 10px 10px 0 0;
+    transform: rotate(-18deg);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .party-horn {
+    position: absolute; bottom: 4px; right: 6px;
+    width: 0; height: 0;
+    border-left: 26px solid #f1c40f;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    transform: rotate(-35deg);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .party-horn::after {
+    content: ""; position: absolute; right: -30px; top: -6px;
+    width: 8px; height: 8px; background: #e74c3c; border-radius: 50%;
+  }
+  .blob.celebrate .party-horn, .mini-blob.celebrate .mini-horn { opacity: 1; }
+  .mini-horn {
+    position: absolute; bottom: 2px; right: 3px;
+    width: 0; height: 0;
+    border-left: 12px solid #f1c40f;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    transform: rotate(-35deg);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  @keyframes blink {
+    0%, 91%, 100% { transform: scaleY(1); }
+    94% { transform: scaleY(0.1); }
+  }
+  @keyframes bounce {
+    0% { transform: scale(1); }
+    30% { transform: scale(1.15) translateY(-8px); }
+    60% { transform: scale(0.95) translateY(0); }
+    100% { transform: scale(1); }
+  }
+
+  .speech-bubble {
+    position: relative;
+    margin: 14px auto 0;
+    max-width: 300px;
+    background: var(--track);
+    color: var(--text);
+    border-radius: 16px;
+    padding: 10px 14px;
+    font-size: 15px;
+    min-height: 20px;
+  }
+  .speech-bubble::before {
+    content: "";
+    position: absolute;
+    top: -8px; left: 50%;
+    transform: translateX(-50%);
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid var(--track);
+  }
+  .speech-bubble.pop { animation: pop 0.25s ease; }
+  @keyframes pop {
+    0% { transform: scale(0.85); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .mini-blob {
+    position: fixed;
+    bottom: 84px; right: 16px;
+    width: 44px; height: 44px;
+    background: linear-gradient(145deg, #f4a261, #e76f51);
+    border-radius: 42% 42% 48% 48%;
+    box-shadow: 0 4px 12px rgba(231,111,81,0.3);
+    cursor: pointer;
+    z-index: 150;
+    transform: scale(0);
+    transition: transform 0.25s ease;
+  }
+  .mini-blob.visible { transform: scale(1); }
+  .mini-eye {
+    position: absolute; top: 14px; width: 5px; height: 7px;
+    background: #fff; border: 1px solid #3d2b1f; border-radius: 50%;
+    animation: miniBlink 4s ease-in-out infinite;
+    animation-delay: 1s;
+  }
+  .mini-eye.left { left: 11px; }
+  .mini-eye.right { right: 11px; }
+  @keyframes miniBlink {
+    0%, 94% { transform: scaleY(1); }
+    97% { transform: scaleY(0.1); }
+  }
+  .mini-blob.celebrate .mini-eye { animation: none; }
+  .mini-mouth {
+    position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+    width: 11px; height: 5px; background: #3d2b1f;
+    border-radius: 0 0 6px 6px;
+    transition: all 0.25s ease;
+  }
+  .mini-speech {
+    position: absolute;
+    bottom: 52px; right: 0;
+    width: 200px;
+    background: var(--card-bg);
+    color: var(--text);
+    border-radius: 12px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.3;
+    box-shadow: 0 4px 12px rgba(231, 111, 81, 0.2);
+    opacity: 0;
+    transform: translateY(6px) scale(0.9);
+    transform-origin: bottom right;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+    pointer-events: none;
+    z-index: 160;
+  }
+  .mini-speech.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  .mini-speech::after {
+    content: "";
+    position: absolute;
+    bottom: -6px; right: 14px;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid var(--card-bg);
+  }
+
+  #confettiBox {
+    position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+    pointer-events: none; overflow: hidden; z-index: 999;
+  }
+  .confetti {
+    position: absolute;
+    width: 10px; height: 14px;
+    opacity: 1;
+    animation: fall 1.6s ease-in forwards;
+  }
+  @keyframes fall {
+    0% { transform: translate(0, -10vh) rotate(0deg); opacity: 1; }
+    100% { transform: translate(var(--drift), 90vh) rotate(720deg); opacity: 0; }
+  }
+
+  h2 { font-size: 14px; color: var(--muted); margin: 18px 0 8px; }
+  .row {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--card-bg); border-radius: 24px; padding: 14px;
+    box-shadow: 0 4px 15px rgba(231, 111, 81, 0.12); margin-bottom: 12px;
+  }
+  .row .num { font-size: 22px; font-weight: bold; color: #e76f51; }
+  button {
+    background: #e76f51; color: #fff; border: none;
+    border-radius: 12px; padding: 12px 16px; font-size: 16px;
+    width: 100%; margin-bottom: 8px; cursor: pointer;
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  button:hover {
+    box-shadow: 0 8px 24px rgba(231, 111, 81, 0.25);
+    transform: translateY(-2px);
+  }
+  button:active { opacity: 0.7; transform: translateY(0); }
+  button.small { width: auto; padding: 10px 14px; }
+  input {
+    width: 70px; padding: 10px; font-size: 16px;
+    border: 1px solid #ccc; border-radius: 10px;
+    background: var(--card-bg); color: var(--text);
+  }
+
+  .close-btn {
+    position: absolute; right: 10px; top: 10px;
+    width: auto;
+    background: none; border: none; color: var(--text);
+    cursor: pointer; font-size: 28px; line-height: 1;
+    padding: 0; z-index: 10;
+  }
+  .close-btn:hover { color: #e74c3c; box-shadow: none; transform: none; }
+
+  .progress-bar {
+    height: 6px; background: var(--track); border-radius: 3px;
+    margin-bottom: 4px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: #e76f51; width: 0%;
+    transition: width 0.4s ease;
+  }
+  .goal-text { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+  .goal-text.done { color: #2ecc71; font-weight: bold; }
+  .facts-counter { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+
+  .streak-badge {
+    display: inline-block;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 8px 16px;
+    font-size: 15px;
+    font-weight: bold;
+    color: #e76f51;
+    box-shadow: 0 4px 15px rgba(231, 111, 81, 0.12);
+    margin-bottom: 8px;
+  }
+  /* ===== Ряд огоньков стрика ===== */
+.streak-week {
+  display: flex; justify-content: center; gap: 4px;
+  background: var(--card-bg); border-radius: 16px; padding: 12px 8px;
+  box-shadow: 0 4px 15px rgba(231, 111, 81, 0.12);
+  margin-bottom: 4px;
+}
+.streak-day {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  font-size: 10px; color: var(--muted);
+}
+.streak-flame {
+  font-size: 24px; line-height: 1;
+  filter: grayscale(1); opacity: 0.35;
+  transition: filter 0.3s, opacity 0.3s;
+}
+.streak-flame.lit { filter: none; opacity: 1; }
+.streak-flame.today { animation: flamePulse 1.5s ease-in-out infinite; }
+@keyframes flamePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+.streak-caption {
+  text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 8px;
+}
+
+/* ===== Полноэкранный огонь ===== */
+#streakOverlay { background: rgba(20, 10, 5, 0.8); }
+.big-flame {
+  position: relative;
+  width: 90px; height: 110px;
+  margin: 16px auto 10px;
+}
+.big-flame .glow {
+  position: absolute; top: -20px; left: -30px; right: -30px; bottom: -10px;
+  background: radial-gradient(circle, rgba(249,199,79,0.55) 0%, rgba(249,199,79,0) 70%);
+  animation: glowPulse 1.2s ease-in-out infinite;
+}
+.big-flame .outer {
+  position: absolute; bottom: 0; left: 50%;
+  width: 70px; height: 100px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 50% 80%, #ff9a3d 0%, #e76f51 45%, rgba(231,111,81,0) 70%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  filter: blur(2px);
+  animation: flickOuter 0.45s ease-in-out infinite alternate;
+}
+.big-flame .inner {
+  position: absolute; bottom: 10px; left: 50%;
+  width: 34px; height: 56px;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 50% 75%, #fff3b0 0%, #f9c74f 60%, rgba(249,199,79,0) 78%);
+  border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%;
+  filter: blur(1px);
+  animation: flickInner 0.35s ease-in-out infinite alternate;
+}
+@keyframes flickOuter {
+  from { transform: translateX(-50%) scale(1, 1) skewX(-3deg); }
+  to   { transform: translateX(-52%) scale(0.94, 1.08) skewX(4deg); }
+}
+@keyframes flickInner {
+  from { transform: translateX(-50%) scale(1, 1) skewX(3deg); }
+  to   { transform: translateX(-48%) scale(0.9, 1.1) skewX(-4deg); }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.15); }
+}
+
+  #weekChart, #stepsChart {
+    display: flex; align-items: flex-end; gap: 6px;
+    height: 70px;
+    background: var(--card-bg);
+    border-radius: 16px;
+    padding: 10px;
+    box-shadow: 0 4px 15px rgba(231, 111, 81, 0.12);
+    margin-bottom: 4px;
+  }
+  .week-col {
+    flex: 1;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    align-items: center; height: 100%;
+  }
+  .week-bar {
+    width: 70%; max-width: 26px;
+    background: #e76f51;
+    border-radius: 6px 6px 2px 2px;
+    min-height: 2px;
+    transition: height 0.4s ease;
+  }
+  .week-bar.today { background: #c94f36; }
+  #stepsChart .week-bar { background: #3498db; }
+  #stepsChart .week-bar.today { background: #2b7cb9; }
+  .week-labels { display: flex; gap: 6px; padding: 0 10px; }
+  .week-labels span {
+    flex: 1; text-align: center;
+    font-size: 10px; color: var(--muted);
+  }
+  #weekHint, #stepsHint { font-size: 12px; color: var(--muted); margin: 4px 0 12px; }
+
+  .overlay {
+    display: none; position: fixed; left: 0; top: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.5); align-items: center; justify-content: center;
+    z-index: 300;
+  }
+  .overlay.open { display: flex; }
+  .modal {
+    background: var(--card-bg); border-radius: 24px; padding: 20px;
+    max-width: 320px; width: 90%; position: relative;
+    box-shadow: 0 4px 20px rgba(231, 111, 81, 0.25); text-align: center;
+  }
+  .modal h3 { margin-bottom: 6px; color: var(--text); }
+  .modal p { color: var(--text); }
+  .modal .quiz-btn {
+    display: block; width: 100%; margin: 8px 0 0;
+    border-radius: 12px; padding: 12px; font-size: 16px; color: #fff;
+  }
+  .modal .yes { background: #2ecc71; }
+  .modal .no { background: #e74c3c; }
+
+  #moodBar {
+    background: linear-gradient(90deg, #e76f51 0%, #f4a261 100%) !important;
+  }
+
+  /* ===== Экран шагов ===== */
+  #stepsScreen {
+  display: none;
+  padding: 20px 0;
+}
+
+  .steps-big-count {
+    font-size: 2.5em; font-weight: bold; margin: 10px 0; color: var(--text);
+  }
+  .steps-bar-wrap {
+    height: 12px; background: var(--track); border-radius: 6px;
+    overflow: hidden; margin: 15px 0;
+  }
+  .steps-btn-outline {
+    width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px;
+    border: 2px solid #3498db; background: var(--card-bg);
+    color: #3498db; font-weight: 600; cursor: pointer;
+  }
+  .steps-btn-solid {
+    width: 100%; padding: 12px; margin-top: 5px; border-radius: 8px;
+    border: none; background: #3498db; color: #fff; font-weight: 600; cursor: pointer;
+  }
+  .steps-btn-back {
+    width: 100%; padding: 12px; margin-top: 20px; border-radius: 8px;
+    border: none; background: var(--track); color: var(--muted); cursor: pointer;
+  }
+  .steps-note { font-size: 0.9em; color: var(--muted); }
+  .steps-input {
+    width: 100%; padding: 8px; box-sizing: border-box; margin-top: 10px;
+  }
+
+  /* ===== Нижняя навигация ===== */
+#bottomNav {
+  position: fixed; bottom: 0; left: 0; right: 0;
+  max-width: 420px; margin: 0 auto;
+  display: flex; gap: 6px; padding: 6px;
+  background: var(--card-bg);
+  box-shadow: 0 -4px 15px rgba(231, 111, 81, 0.15);
+  z-index: 250;
+}
+
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  border: none; background: none; color: var(--muted);
+  font-size: 12px; padding: 8px 4px; border-radius: 12px; cursor: pointer;
+  margin-bottom: 0;
+}
+
+.nav-btn .nav-ico { font-size: 20px; }
+.nav-btn.active { color: #e76f51; background: var(--track); font-weight: bold; }
+
+/* ===== Прокачанный экран шагов ===== */
+.steps-big-count { font-size: 3em; font-weight: bold; margin: 10px 0 2px; color: var(--text); }
+.steps-sub { font-size: 14px; color: var(--muted); margin-bottom: 10px; }
+.steps-btns { display: flex; gap: 8px; margin: 12px 0; }
+.steps-btns button { flex: 1; margin-bottom: 0; padding: 12px 4px; }
+.steps-danger {
+  width: 100%; padding: 12px; margin-top: 6px; border-radius: 8px;
+  border: 2px solid #e74c3c; background: none; color: #e74c3c;
+  font-weight: 600; cursor: pointer;
+}
+.steps-done-note {
+  color: #2ecc71; font-weight: bold; margin: 8px 0;
+}
+/* ===== Трекер прогулки ===== */
+.tracker-panel {
+  background: var(--card-bg); border-radius: 12px;
+  padding: 14px; margin: 20px 0; box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+}
+.tracker-stats { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tracker-km { font-size: 1.5em; font-weight: bold; color: #e76f51; }
+.tracker-timer { font-size: 13px; color: var(--muted); }
+.tracker-btn-group { display: flex; gap: 8px; width: 100%; }
+.tracker-btn { flex: 1; padding: 10px; border-radius: 8px; border: none; cursor: pointer; font-weight: 600; }
+.btn-start { background: #3498db; color: white; }
+.btn-stop { background: #e74c3c; color: white; display: none; }
+.tracker-status { margin-top: 6px; font-size: 12px; color: var(--muted); text-align: center; }
+
+/* ===== Засветление истории прогулок ===== */
+#walkHistoryWrap { position: relative; }
+
+#walkHistoryWrap.collapsed #walkHistoryList {
+  overflow: hidden;
+}
+
+#walkHistoryWrap.collapsed::after {
+  content: "";
+  position: absolute;
+  left: -14px; right: -14px; bottom: 0;
+  height: 70px;
+  background: linear-gradient(transparent, var(--card-bg));
+  pointer-events: none;
+}
+
+#showMoreWalksBtn {
+  position: absolute;
+  left: 50%; bottom: 6px;
+  transform: translateX(-50%);
+  z-index: 2;
+  width: auto;
+  margin: 0;
+  padding: 6px 20px;
+  border: 1.5px solid #e76f51;
+  border-radius: 20px;
+  background: var(--card-bg);
+  color: #e76f51;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.walk-stats-link {
+  display: none;
+  width: auto;
+  margin: 8px 0 0;
+  padding: 0;
+  background: none;
+  border: none;
+  color: #e76f51;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.walk-stats-link.visible { display: inline-block; }
+/* Кнопка «Скрыть» — вне градиента, под списком */
+#showMoreWalksBtn.expanded {
+  position: static;
+  transform: none;
+  display: block !important;
+  margin: 8px auto 0;
+  left: auto; bottom: auto;
+}
+
+/* Когда список раскрыт — градиент не нужен */
+#walkHistoryWrap:not(.collapsed)::after {
+  content: none;
+}
+
+</style>
+</head>
+<body>
+
+<div id="confettiBox"></div>
+<div id="mainScreen">
+
+<button class="icon-btn" id="themeBtn" onclick="toggleTheme()">🌙</button>
+<button class="icon-btn" id="achievementsBtn" onclick="openAchievements()" title="Достижения">🏆</button>
+<button class="icon-btn" id="settingsBtn" onclick="openSettings()">⚙️</button>
+
+<div class="char" id="charBlock">
+  <div class="blob" id="blob">
+    <div class="nightcap"></div>
+    <div class="eye left"><div class="pupil"></div></div>
+    <div class="eye right"><div class="pupil"></div></div>
+    <div class="mouth"></div>
+    <div class="party-horn"></div>
+  </div>
+  <div class="speech-bubble" id="speechBubble">Привет!</div>
+</div>
+
+<div class="streak-week" id="streakWeek"></div>
+<p class="streak-caption">Стрик: <span id="streakCount">0</span> дн. 🔥</p>
+
+<p id="dayHint" style="background:var(--card-bg); border-radius:12px; padding:10px 14px; font-size:13px; color:var(--muted); box-shadow:0 4px 15px rgba(231,111,81,0.12); margin-bottom:16px;"></p>
+<h2>Вода</h2>
+<div class="row">
+  <div class="num"><span id="water">0</span> 💧</div>
+  <button class="small" onclick="addWater()">+1 стакан</button>
+</div>
+<div class="progress-bar" id="waterBarWrap"><div class="progress-fill" id="waterBar"></div></div>
+<p class="goal-text" id="waterGoalText">Цель: <span id="waterGoalDisplay">8</span> стаканов</p>
+
+<h2>Сон</h2>
+<div class="row">
+  <div class="num"><span id="sleep">0</span> ч 😴</div>
+  <input type="number" id="sleepInput" placeholder="ч">
+  <button class="small" onclick="addSleep()">Записать</button>
+</div>
+<div class="progress-bar" id="sleepBarWrap"><div class="progress-fill" id="sleepBar"></div></div>
+<p class="goal-text" id="sleepGoalText">Цель: <span id="sleepGoalDisplay">7</span> часов</p>
+
+<h2>Неделя по воде</h2>
+<div id="weekChart"></div>
+<div class="week-labels">
+  <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
+</div>
+<p id="weekHint">Столбики — сколько воды ты выпивал за день.</p>
+
+<h2>Неделя по шагам</h2>
+<div id="stepsChart"></div>
+<div class="week-labels">
+  <span>пн</span><span>вт</span><span>ср</span><span>чт</span><span>пт</span><span>сб</span><span>вс</span>
+</div>
+<p id="stepsHint">Синие столбики — сколько шагов ты проходил за день.</p>
+
+<p class="facts-counter" style="margin-top:18px;">Прочитано фактов: <span id="factsCount">0</span> 📚<br>
+<span style="font-size:11px;">Новые факты появляются в моём окошке сами, раз в 45 секунд</span></p>
+
+<h2>Викторина</h2>
+<button onclick="startQuiz()">Правда или миф?</button>
+
+
+<h3 style="font-size:13px; color:var(--muted); margin-top:20px;">Настроение бота</h3>
+<div style="height:6px; background:var(--track); border-radius:3px;">
+  <div id="moodBar" style="height:100%; background:#e76f51; width:0%; border-radius:3px; transition:width 0.4s;"></div>
+</div>
+<p style="font-size:12px; color:var(--muted); margin-top:4px;">Чем больше делаешь — тем бодрее он становится!</p>
+
+<button id="nextDayBtn" onclick="manualNewDay()" style="background:#c94f36; margin-top:20px;">Следующий день (закрой цели)</button>
+</div> <!-- конец mainScreen -->
+
+<div class="mini-blob" id="miniBlob" onclick="scrollToChar()">
+  <div class="mini-speech" id="miniSpeech"></div>
+  <div class="mini-nightcap"></div>
+  <div class="mini-eye left"></div>
+  <div class="mini-eye right"></div>
+  <div class="mini-mouth"></div>
+  <div class="mini-horn"></div>
+</div>
+
+<div class="overlay" id="confirmOverlay">
+    <div class="modal">
+      <button class="close-btn" onclick="hideCard('confirmOverlay')">&times;</button>
+      <h3>Перейти в новый день?</h3>
+      <p id="confirmText" style="margin:10px 0;"></p>
+      <button class="quiz-btn yes" onclick="forceNewDay()">Да, вперёд!</button>
+      <button class="quiz-btn no" onclick="hideCard('confirmOverlay')">Нет, доделаю</button>
+    </div>
+  </div>
+  
+<div class="overlay" id="streakOverlay">
+    <div class="modal">
+      <h3>День закрыт!</h3>
+      <div class="big-flame">
+        <div class="glow"></div>
+        <div class="outer"></div>
+        <div class="inner"></div>
+      </div>
+      <p id="streakSplashText" style="font-size:18px; font-weight:bold;"></p>
+      <button onclick="hideStreakSplash()" style="background:#e76f51;">Круто!</button>
+    </div>
+  </div>  
+<div class="overlay" id="quizOverlay">
+  <div class="modal" id="quizModal">
+    <button class="close-btn" onclick="hideCard('quizOverlay')">&times;</button>
+    <p id="quizQuestion"></p>
+    <div id="quizAnswers"></div>
+  </div>
+</div>
+
+<div class="overlay" id="achievementsOverlay">
+  <div class="modal">
+    <button class="close-btn" onclick="hideCard('achievementsOverlay')">&times;</button>
+    <h3>🏆 Твои достижения</h3>
+    <p style="color:var(--muted); font-size:13px; margin:6px 0 12px;">Выполняй цели — собирай награды!</p>
+    <div id="achievementsBox"></div>
+  </div>
+</div>
+
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <button class="close-btn" onclick="hideCard('settingsOverlay')">&times;</button>
+    <h3>Цели на день</h3>
+    <p style="margin:10px 0; color:var(--muted);">Сколько стаканов воды, часов сна и шагов хочешь сегодня?</p>
+    <div style="display:flex; gap:10px; margin:10px 0;">
+      <input type="number" id="newWaterGoal" placeholder="стаканы" style="width:100%">
+      <input type="number" id="newSleepGoal" placeholder="часы" style="width:100%">
+    </div>
+    <div style="margin:10px 0;">
+      <input type="number" id="newStepsGoal" placeholder="шаги в день" style="width:100%">
+    </div>
+    <button onclick="saveGoals()" style="width:100%; background:#e76f51;">Сохранить</button>
+        <hr style="border:none; border-top:1px solid var(--divider); margin:14px 0;">
+    <p style="margin:8px 0; color:var(--muted); font-size:13px;">Резервная копия прогресса</p>
+    <div style="display:flex; gap:8px; align-items:stretch;">
+      <button onclick="exportData()" style="width:50%; margin-bottom:0; background:#2ecc71; font-size:14px; line-height:1;">💾 Скачать</button>
+      <label style="width:50%; background:#3498db; color:#fff; border-radius:12px; padding:12px 0; font-size:14px; line-height:1; text-align:center; cursor:pointer; display:flex; align-items:center; justify-content:center; box-sizing:border-box;">
+        📂 Загрузить
+        <input type="file" accept=".json" onchange="importData(this.files[0])" style="display:none;">
+      </label>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ЭКРАН ШАГОВ ===== -->
+<div id="stepsScreen" style="display:none;">
+    <h2>🚶 Шаги</h2>
+  
+    <div class="char" style="text-align:center;">
+      <p class="steps-big-count"><span id="stepsCount">0</span></p>
+      <p class="steps-sub" id="stepsSub">из 8000 — осталось 8000</p>
+  
+      <div class="steps-bar-wrap">
+        <div id="stepsBar" style="height:100%; width:0%; background:#3498db; transition:width 0.4s; border-radius:6px;"></div>
+      </div>
+      <p id="stepsPercent" style="font-size:13px; color:var(--muted);">0%</p>
+      <p id="stepsDistance" style="font-size:13px; color:var(--muted); margin-bottom:6px;">≈ 0 км пройдено</p>
+      <p id="stepsDoneNote" class="steps-done-note" style="display:none;">Цель дня достигнута! 🎉</p>
+    </div>
+  
+    <h2>Добавить шаги</h2>
+
+<div class="tracker-panel">
+  <h3>🗺 Прогулка с трекером</h3>
+
+  <div class="tracker-stats">
+    <span class="tracker-km"><span id="trackerKm">0.00</span> км</span>
+    <span class="tracker-timer">Время: <span id="trackerTime">00:00</span></span>
+  </div>
+
+  <p id="trackerStatus" class="tracker-status">Готов к прогулке. Нажмите «Пойти гулять»</p>
+
+  <div class="tracker-btn-group">
+    <button class="tracker-btn btn-start" onclick="startWalk()">Пойти гулять</button>
+    <button class="tracker-btn btn-stop" onclick="stopWalk()">Стоп</button>
+  </div>
+</div>
+
+<div class="tracker-panel">
+    <h3 style="font-size:14px; color:var(--muted);">🗺 Последние прогулки</h3>
+  
+    <div id="walkHistoryWrap">
+      <div id="walkHistoryList" style="font-size:13px; color:var(--text);"></div>
+      <button id="showMoreWalksBtn" style="display:none;" onclick="toggleWalkHistory()">Показать ещё</button>
+    </div>
+  
+    <button class="walk-stats-link" id="walkStatsLink" onclick="showWalkStats()">📊 подробная статистика</button>
+  </div>  
+
+<div class="steps-btns">
+  <button style="background:#3498db;" onclick="addSteps(500)">+500</button>
+  <button style="background:#3498db;" onclick="addSteps(1000)">+1000</button>
+  <button style="background:#3498db;" onclick="addSteps(5000)">+5000</button>
+</div>
+  
+    <input type="number" id="manualSteps" placeholder="Ввести шаги вручную" class="steps-input">
+    <button class="steps-btn-solid" onclick="addManualSteps()">Ввести</button>
+  
+    <button class="steps-danger" onclick="resetStepsDay()">Сбросить шаги за день</button>
+  
+    <p class="steps-note" style="margin-top:12px;">
+        Цель меняется в настройках ⚙️. 8 000 шагов — примерно 6–7 км.
+      </p>
+    </div>
+  
+    <!-- новый экран статистики -->
+    <div id="statsScreen" style="display:none; padding: 16px;">
+    
+      <button onclick="showScreen('steps')" style="background:none; border:none; color:#e76f51; cursor:pointer; margin-bottom:12px; font-size:14px;">← Назад к шагам</button>
+  
+      <div class="tracker-panel" style="padding:16px; text-align:center;">
+        <h3 style="color:var(--muted); margin-top:0; font-weight:normal;">📊 Твоя статистика</h3>
+  
+        <div style="margin:16px 0; display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div>
+            <div style="font-size:32px; color:#e76f51; font-weight:bold;" id="statTotalKm">0.0</div>
+            <div style="color:var(--muted); font-size:12px;">Всего км</div>
+          </div>
+          <div>
+            <div style="font-size:32px; color:#e76f51; font-weight:bold;" id="statWalksCount">0</div>
+            <div style="color:var(--muted); font-size:12px;">Прогулок</div>
+          </div>
+          <div>
+            <div style="font-size:24px; color:var(--text);" id="statAvgKm">0.0</div>
+            <div style="color:var(--muted); font-size:12px;">Среднее за прогулку</div>
+          </div>
+          <div>
+            <div style="font-size:24px; color:var(--text);" id="statMaxKm">0.0</div>
+            <div style="color:var(--muted); font-size:12px;">Самый длинный маршрут</div>
+          </div>
+        </div>
+  
+        <p style="color:var(--muted); font-size:13px; line-height:1.4;">
+          Статистика учитывает все прогулки, сохранённые в истории. Данные обновляются автоматически.
+        </p>
+      </div>
+    </div>  
+  <!-- ===== КОНЕЦ ЭКРАНА ШАГОВ ===== -->
+  
+  <!-- ===== НИЖНЯЯ НАВИГАЦИЯ ===== -->
+  <nav id="bottomNav">
+    <button class="nav-btn active" data-screen="main" onclick="showScreen('main')">
+      <span class="nav-ico">🏠</span>Главный экран
+    </button>
+    <button class="nav-btn" data-screen="steps" onclick="showScreen('steps')">
+      <span class="nav-ico">🚶</span>Шаги
+    </button>
+  </nav>  
+
+<script>
+let data = JSON.parse(localStorage.getItem("healthData")) || {
+  water: 0, sleep: 0, steps: 0, facts: 0, mood: 0,
+  lastDate: null, lastCountedDate: null,
+  history: {}, streak: 0, waterDone: false, sleepDone: false,
+  lastAction: Date.now()
+};
+data.walks = data.walks || [];
+
+/* Миграция: у старых сохранений может не хватать новых полей — добавляем */
+data.history = data.history || {};
+data.streak = data.streak || 0;
+if (data.waterDone === undefined) data.waterDone = false;
+if (data.sleepDone === undefined) data.sleepDone = false;
+if (data.lastAction === undefined) data.lastAction = Date.now();
+if (data.steps === undefined) data.steps = 0;
+/* Чистим записи старого формата (например, "Wed Nov 11 2026") —
+   график их всё равно не видит, а мусор лучше убрать */
+for (const k in data.history) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(k)) delete data.history[k];
+}
+
+let goals = JSON.parse(localStorage.getItem("healthGoals")) || { water: 8, sleep: 7, steps: 8000 };
+if (goals.steps === undefined) goals.steps = 8000;
+let lastQuestionIndex = -1;
+let walkTimer = null;
+let startTime = null;
+let lastPos = null;
+let totalDistance = 0; // в метрах
+let isWalking = false;
+let walkHistoryExpanded = false;
+let achievements = JSON.parse(localStorage.getItem("achievements") || "[]");
+function saveAchievements() {
+  localStorage.setItem("achievements", JSON.stringify(achievements));
+}
+let waterReminderTimer = null;
+const REMIND_INTERVAL_MIN = 45; // для теста поменяй 45 на 1
+
+const FACTS = [
+  "Почти половина всех костей человека — в руках и стопах.",
+  "Сердце за день перекачивает около 7000 литров крови.",
+  "Ночью человек становится чуть ниже ростом.",
+  "Мозг — 2% массы тела, но тратит около 20% энергии.",
+  "Без воды человек может прожить всего 3–4 дня.",
+  "Желудочный сок способен растворить металл (но стенки желудка обновляются каждые 3–4 дня).",
+  "Человек делает около 23 000 вдохов в день — и почти не замечает этого."
+];
+
+const QUIZ = [
+  { q: "Морковь резко улучшает зрение?", a: "миф", e: "Витамин А полезен для глаз, но зрение не улучшит." },
+  { q: "8 стаканов воды обязательны для всех?", a: "миф", e: "Норма у всех разная. Пей по жажде." },
+  { q: "Короткий дневной сон (20–30 мин) бодрит?", a: "правда", e: "А вот долгий дневной сон может сбить ночной режим." },
+  { q: "Кофе помогает проснуться, но не восполняет сон?", a: "правда", e: "Кофеин маскирует усталость, но не заменяет отдых." },
+  { q: "Холодная вода ускоряет обмен веществ?", a: "миф", e: "Эффект минимальный. Главное — пить достаточно." }
+];
+
+const CONFETTI_COLORS = ["#e76f51", "#f4a261", "#f1c40f", "#2ecc71", "#4ecdc4", "#e74c3c"];
+
+function getDayStory() {
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  const stGoal = Number(goals.steps) || 8000;
+  const parts = [];
+
+  if (data.water >= wGoal) {
+    parts.push("Ты сегодня налил столько воды, что я даже булькал от гордости.");
+  } else if (data.water >= wGoal * 0.5) {
+    parts.push(`Ты налил ${data.water} стаканов — это уже круто, я считаю.`);
+  } else {
+    parts.push("Сегодня с водой было непросто, но один стакан — это уже победа.");
+  }
+
+  if (data.sleep >= sGoal) {
+    parts.push("И сон записал — вот это я понимаю, забота о себе.");
+  } else if (data.sleep > 0) {
+    parts.push(`Сон ${data.sleep} часов — уже лучше, чем ничего.`);
+  } else {
+    parts.push("Сон сегодня не записал… Ничего страшного, бывает.");
+  }
+
+  if (data.steps >= stGoal) {
+    parts.push("А шагов сегодня — целый марафон! Мои виртуальные лапки аплодируют.");
+  } else if (data.steps > 0) {
+    parts.push(`И ${data.steps} шагов за день — тоже движение, я всё записал.`);
+  }
+
+  if (data.streak >= 3) {
+    parts.push(`А ещё у тебя стрик из ${data.streak} дней! Я прямо чувствую, как он светится.`);
+  } else if (data.streak === 1) {
+    parts.push("И ты сегодня вообще первый раз зашёл — это самое важное начало.");
+  }
+
+  parts.push("Я тут посижу, посторожу твои цифры. Спокойной ночи или хорошего дня — как тебе ближе.");
+
+  return parts.join(" ");
+}
+
+let miniSpeechTimer = null;
+let lastMood = null;
+
+function save() { localStorage.setItem("healthData", JSON.stringify(data)); }
+function persistGoals() { localStorage.setItem("healthGoals", JSON.stringify(goals)); }
+
+/* ===== Дни, архив и стрик ===== */
+function dateKey(d) {
+  return d.getFullYear() + "-" +
+    String(d.getMonth() + 1).padStart(2, "0") + "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+function todayKey() { return dateKey(new Date()); }
+
+function dayMet(entry) {
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  const stGoal = Number(goals.steps) || 8000;
+  return entry && entry.water >= wGoal &&
+    entry.sleep >= sGoal &&
+    (entry.steps || 0) >= stGoal;
+}
+
+function recalcDoneStatus() {
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  if (!data.waterDone && data.water >= wGoal) data.waterDone = true;
+  if (!data.sleepDone && data.sleep >= sGoal) data.sleepDone = true;
+  save();
+}
+
+function archiveAndCount(dayKey, entry) {
+  data.history = data.history || {};
+  data.history[dayKey] = {
+    water: entry.water,
+    sleep: entry.sleep,
+    steps: entry.steps || 0
+  };
+  if (data.lastCountedDate !== dayKey) {
+    data.streak = dayMet(entry) ? (data.streak || 0) + 1 : 0;
+    data.lastCountedDate = dayKey;
+  }
+}
+
+function resetCounters() {
+  data.water = 0;
+  data.sleep = 0;
+  data.steps = 0;
+  data.waterDone = false;
+  data.sleepDone = false;
+  save();
+  document.getElementById("water").textContent = 0;
+  document.getElementById("sleep").textContent = 0;
+  updateStepsUI();
+  renderWeekSteps();
+  applyDoneState();
+  updateProgressBars();
+  startWaterReminders();
+}
+
+function rolloverIfNeeded() {
+  const today = todayKey();
+  if (data.lastDate && data.lastDate !== today) {
+    const prev = new Date(data.lastDate + "T00:00:00");
+    const now = new Date(today + "T00:00:00");
+    const gapDays = Math.round((now - prev) / 86400000);
+    if (gapDays > 1) data.streak = 0; // пропустил хотя бы день — цепочка сгорела
+    archiveAndCount(data.lastDate, { water: data.water, sleep: data.sleep, steps: data.steps });
+    resetCounters();
+  }
+  data.lastDate = today;
+  save();
+  updateStreak();
+}
+
+function manualNewDay() {
+  recalcDoneStatus();
+
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  const stGoal = Number(goals.steps) || 8000;
+
+  if (data.water < wGoal || data.sleep < sGoal || (data.steps || 0) < stGoal) {
+    const missing = [];
+    if (data.water < wGoal) missing.push(`вода ${data.water}/${wGoal}`);
+    if (data.sleep < sGoal) missing.push(`сон ${data.sleep}/${sGoal}`);
+    if ((data.steps || 0) < stGoal) missing.push(`шаги ${data.steps || 0}/${stGoal}`);
+
+    document.getElementById("confirmText").textContent =
+      "Ещё не закрыто: " + missing.join(", ") +
+      ". Если перейдёшь в новый день — огонёк за этот день сгорит и стрик прервётся. Точно продолжаем?";
+    document.getElementById("confirmOverlay").classList.add("open");
+    return;
+  }
+
+  archiveAndCount(todayKey(), { water: data.water, sleep: data.sleep, steps: data.steps });
+  resetCounters();
+  renderWeek();
+  updateStreak();
+  applyDoneState();
+  showStreakSplash(data.streak || 0);
+  resetIdle();
+}
+
+function forceNewDay() {
+  hideCard("confirmOverlay");
+  archiveAndCount(todayKey(), { water: data.water, sleep: data.sleep, steps: data.steps });
+  resetCounters();
+  renderWeek();
+  updateStreak();
+  applyDoneState();
+  say("Новый день — новый старт! 🔥", "celebrate");
+  throwConfetti(30);
+  resetIdle();
+}
+
+function updateStreak() {
+  const stGoal = Number(goals.steps) || 8000;
+  const shown = (data.streak || 0) +
+    ((data.waterDone && data.sleepDone && (data.steps || 0) >= stGoal) ? 1 : 0);
+  document.getElementById("streakCount").textContent = shown;
+  renderStreakWeek();
+}
+
+function renderStreakWeek() {
+  const box = document.getElementById("streakWeek");
+  if (!box) return;
+  box.innerHTML = "";
+
+  const labels = ["пн", "вт", "ср", "чт", "пт", "сб", "вс"];
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  const stGoal = Number(goals.steps) || 8000;
+
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    const key = dateKey(d);
+    const isToday = key === todayKey();
+    const entry = data.history[key];
+
+    let lit = false;
+    if (isToday) {
+      lit = (data.waterDone && data.sleepDone && (data.steps || 0) >= stGoal) ||
+        (entry && entry.water >= wGoal && entry.sleep >= sGoal && (entry.steps || 0) >= stGoal);
+    } else if (entry) {
+      lit = entry.water >= wGoal && entry.sleep >= sGoal && (entry.steps || 0) >= stGoal;
+    }
+
+    const day = document.createElement("div");
+    day.className = "streak-day";
+
+    const flame = document.createElement("div");
+    flame.className = "streak-flame" + (lit ? " lit" : "") + (isToday ? " today" : "");
+    flame.textContent = "🔥";
+    flame.title = key + (lit ? " — цели закрыты!" : " — цели не закрыты");
+
+    const lbl = document.createElement("span");
+    lbl.textContent = labels[i];
+
+    day.appendChild(flame);
+    day.appendChild(lbl);
+    box.appendChild(day);
+  }
+}
+
+function showStreakSplash(streakValue) {
+  const text = document.getElementById("streakSplashText");
+  if (streakValue > 1) {
+    text.textContent = `🔥 Стрик: ${streakValue} дн. — не разрывай цепочку!`;
+  } else {
+    text.textContent = "🔥 Все цели дня закрыты! Так держать!";
+  }
+  document.getElementById("streakOverlay").classList.add("open");
+}
+
+function hideStreakSplash() {
+  document.getElementById("streakOverlay").classList.remove("open");
+  say("Новый день — новый старт! 🔥", "celebrate");
+  throwConfetti(30);
+}
+
+function applyDoneState() {
+  const wWrap = document.getElementById("waterBarWrap");
+  const sWrap = document.getElementById("sleepBarWrap");
+  const wText = document.getElementById("waterGoalText");
+  const sText = document.getElementById("sleepGoalText");
+
+  if (data.waterDone) {
+    wWrap.style.display = "none";
+    wText.textContent = "Цель достигнута! Старайся сегодня больше не пить 💧";
+    wText.classList.add("done");
+  } else {
+    wWrap.style.display = "";
+    wText.innerHTML = 'Цель: <span id="waterGoalDisplay">' + (Number(goals.water) || 8) + '</span> стаканов';
+    wText.classList.remove("done");
+  }
+
+  if (data.sleepDone) {
+    sWrap.style.display = "none";
+    sText.textContent = "Цель достигнута! Старайся сегодня больше не спать 😴";
+    sText.classList.add("done");
+  } else {
+    sWrap.style.display = "";
+    sText.innerHTML = 'Цель: <span id="sleepGoalDisplay">' + (Number(goals.sleep) || 7) + '</span> часов';
+    sText.classList.remove("done");
+  }
+
+  const btn = document.getElementById("nextDayBtn");
+  if (data.waterDone && data.sleepDone) {
+    btn.style.background = "#2ecc71";
+    btn.textContent = "Следующий день →";
+  } else {
+    btn.style.background = "#c94f36";
+    btn.textContent = "Следующий день (закрой цели)";
+  }
+}
+
+/* ===== Недельные графики ===== */
+function renderWeek() {
+  const chart = document.getElementById("weekChart");
+  chart.innerHTML = "";
+  const now = new Date();
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = dateKey(d);
+    const entry = data.history[key];
+    let water = 0;
+    if (i === 0) water = data.water;
+    else if (entry) water = entry.water;
+
+    const col = document.createElement("div");
+    col.className = "week-col";
+    const bar = document.createElement("div");
+    bar.className = "week-bar" + (i === 0 ? " today" : "");
+    const pct = Math.min(100, (water / (Number(goals.water) || 8)) * 100);
+    bar.style.height = Math.max(2, pct) + "%";
+    bar.title = key + ": " + water + " стаканов";
+    col.appendChild(bar);
+    chart.appendChild(col);
+  }
+}
+
+function renderWeekSteps() {
+  const chart = document.getElementById("stepsChart");
+  if (!chart) return;
+  chart.innerHTML = "";
+  const now = new Date();
+  const goal = Number(goals.steps) || 8000;
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const key = dateKey(d);
+    const entry = data.history[key];
+    let steps = 0;
+    if (i === 0) steps = data.steps || 0;
+    else if (entry) steps = entry.steps || 0;
+
+    const col = document.createElement("div");
+    col.className = "week-col";
+    const bar = document.createElement("div");
+    bar.className = "week-bar" + (i === 0 ? " today" : "");
+    const pct = Math.min(100, (steps / goal) * 100);
+    bar.style.height = Math.max(2, pct) + "%";
+    bar.title = key + ": " + steps + " шагов";
+    col.appendChild(bar);
+    chart.appendChild(col);
+  }
+}
+
+
+function renderWalkHistory() {
+  const list = document.getElementById('walkHistoryList');
+  const wrap = document.getElementById('walkHistoryWrap');
+  const moreBtn = document.getElementById('showMoreWalksBtn');
+  const statsLink = document.getElementById('walkStatsLink');
+  if (!list || !wrap) return;
+
+  if (!data.walks || data.walks.length === 0) {
+    list.innerHTML = '<div style="color: var(--muted);">Пока нет записей</div>';
+    wrap.classList.remove('collapsed');
+    if (moreBtn) moreBtn.style.display = 'none';
+    if (statsLink) statsLink.classList.remove('visible');
+    return;
+  }
+
+  const sorted = [...data.walks].reverse();
+  const hasMore = sorted.length > 4;
+  const collapsed = hasMore && !walkHistoryExpanded;
+
+  list.innerHTML = sorted.map(w => `
+    <div style="border-bottom: 1px solid var(--divider); padding: 6px 0;">
+      <span style="color: #e76f51; font-weight: 600;">${w.km.toFixed(1)} км</span> → ${w.steps} шагов<br>
+      <span style="font-size: 11px; color: var(--muted);">${w.date} в ${w.time}</span>
+    </div>
+  `).join('');
+
+  if (list.lastElementChild) list.lastElementChild.style.borderBottom = 'none';
+
+  if (collapsed) {
+    const items = list.children;
+    let h = 0;
+    for (let i = 0; i < Math.min(4, items.length); i++) {
+      h += items[i].getBoundingClientRect().height;
+    }
+    if (items.length > 4) h += items[4].getBoundingClientRect().height * 0.45;
+    list.style.maxHeight = Math.round(h) + 'px';
+  } else {
+    list.style.maxHeight = '';
+  }
+
+  wrap.classList.toggle('collapsed', collapsed);
+  if (moreBtn) {
+    if (hasMore) {
+      moreBtn.style.display = 'block';
+      moreBtn.textContent = collapsed ? 'Показать ещё' : 'Скрыть';
+      moreBtn.classList.toggle('expanded', !collapsed);
+    } else {
+      moreBtn.style.display = 'none';
+      moreBtn.classList.remove('expanded');
+    }
+  }
+  if (statsLink) statsLink.classList.toggle('visible', !collapsed);
+}
+
+function showWalkStats() {
+  showScreen('stats');       // переключаем на экран статистики
+  renderStatsScreen();        // сразу считаем и показываем цифры
+  say('Вот твоя статистика за всё время. Горжусь каждым твоим шагом! 😊', 'think');
+}
+
+function toggleWalkHistory() {
+  walkHistoryExpanded = !walkHistoryExpanded;
+  renderWalkHistory();
+}
+
+function renderStatsScreen() {
+  if (!data.walks || data.walks.length === 0) {
+    document.getElementById('statTotalKm').textContent = '0.0';
+    document.getElementById('statWalksCount').textContent = '0';
+    document.getElementById('statAvgKm').textContent = '—';
+    document.getElementById('statMaxKm').textContent = '—';
+    return;
+  }
+
+  const totalKm = data.walks.reduce((sum, w) => sum + w.km, 0);
+  const count = data.walks.length;
+  const avgKm = totalKm / count;
+  const maxKm = Math.max(...data.walks.map(w => w.km));
+
+  document.getElementById('statTotalKm').textContent = totalKm.toFixed(1);
+  document.getElementById('statWalksCount').textContent = count;
+  document.getElementById('statAvgKm').textContent = avgKm.toFixed(1);
+  document.getElementById('statMaxKm').textContent = maxKm.toFixed(1);
+}
+
+/* ===== Персонаж и диалог ===== */
+function say(text, mood) {
+  lastMood = mood;
+  const bubble = document.getElementById("speechBubble");
+  bubble.textContent = text;
+  bubble.classList.remove("pop");
+  void bubble.offsetWidth;
+  bubble.classList.add("pop");
+
+  const miniSpeech = document.getElementById("miniSpeech");
+  miniSpeech.textContent = text;
+  miniSpeech.classList.remove("show");
+  void miniSpeech.offsetWidth;
+  miniSpeech.classList.add("show");
+
+  clearTimeout(miniSpeechTimer);
+  miniSpeechTimer = setTimeout(() => {
+    miniSpeech.classList.remove("show");
+  }, mood === "celebrate" ? 900 : 5000);
+
+  const moods = ["happy", "think", "wow", "sleep", "sleepy"];
+  const big = document.getElementById("blob");
+  const mini = document.getElementById("miniBlob");
+  [big, mini].forEach(el => el.classList.remove(...moods, "celebrate"));
+
+  if (mood === "celebrate") {
+    big.classList.add("celebrate");
+    mini.classList.add("celebrate");
+    setTimeout(() => {
+      big.classList.remove("celebrate");
+      mini.classList.remove("celebrate");
+    }, 900);
+  } else if (mood) {
+    big.classList.add(mood);
+    mini.classList.add(mood);
+    if (mood === "sleep") {
+      big.classList.add("sleepy");
+      mini.classList.add("sleepy");
+    }
+  }
+}
+
+function throwConfetti(count) {
+  const box = document.getElementById("confettiBox");
+  for (let i = 0; i < count; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti";
+    piece.style.left = Math.random() * 100 + "%";
+    piece.style.background = CONFETTI_COLORS[Math.floor(Math.random() * CONFETTI_COLORS.length)];
+    piece.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    piece.style.setProperty("--drift", (Math.random() * 120 - 60) + "px");
+    piece.style.animationDelay = Math.random() * 0.4 + "s";
+    piece.style.animationDuration = (1.2 + Math.random() * 0.8) + "s";
+    box.appendChild(piece);
+    setTimeout(() => piece.remove(), 2500);
+  }
+}
+
+function addMood(points) {
+  data.mood = Math.max(0, Math.min(100, (data.mood || 0) + points));
+  save();
+  document.getElementById("moodBar").style.width = data.mood + "%";
+
+  if (data.mood >= 95 && lastMood !== "celebrate") {
+    say("Ты сегодня прям супергерой! Можно и выдохнуть, я тут посижу.", "happy");
+    data.mood = 85;
+  } else if (data.mood <= 10 && Date.now() - (data.lastAction || 0) > 10 * 60 * 1000) {
+    say("Всё в порядке, один стакан — уже победа. Не гони себя.", "think");
+  }
+  data.lastAction = Date.now();
+  save();
+}
+
+function hideCard(id) {
+  const el = document.getElementById(id);
+  if (el.classList.contains("overlay")) {
+    el.classList.remove("open");
+  } else {
+    el.style.display = "none";
+  }
+  resetIdle();
+}
+
+/* ===== Фраза дня ===== */
+function updateDayHint() {
+  const el = document.getElementById("dayHint");
+  if (!el) return;
+
+  const wGoal = Number(goals.water) || 8;
+  const sGoal = Number(goals.sleep) || 7;
+  const stGoal = Number(goals.steps) || 8000;
+  const parts = [];
+
+  const leftWater = wGoal - (data.water || 0);
+  if (data.waterDone) parts.push("Вода: цель закрыта 💧");
+  else if (leftWater === 1) parts.push("Вода: остался один стакан — добьём!");
+  else parts.push(`Вода: осталось ${leftWater} стаканов`);
+
+  if (data.sleepDone) parts.push("Сон: норма записана 😴");
+  else if ((data.sleep || 0) > 0) parts.push(`Сон: записано ${data.sleep} из ${sGoal} ч`);
+  else parts.push(`Сон: пока не записан (цель ${sGoal} ч)`);
+
+  const leftSteps = stGoal - (data.steps || 0);
+  if (leftSteps <= 0) parts.push("Шаги: дневной марафон пройден 🎉");
+  else if (leftSteps <= 1500) parts.push(`Шаги: до цели всего ${leftSteps} — ты почти у неё!`);
+  else parts.push(`Шаги: осталось ${leftSteps}`);
+
+  el.textContent = parts.join(" · ");
+}
+
+function updateProgressBars() {
+  const wPercent = Math.min(100, (data.water / (Number(goals.water) || 8)) * 100);
+  const sPercent = Math.min(100, (data.sleep / (Number(goals.sleep) || 7)) * 100);
+  document.getElementById("waterBar").style.width = wPercent + "%";
+  document.getElementById("sleepBar").style.width = sPercent + "%";
+
+  const avg = (wPercent + sPercent) / 2;
+  const speed = Math.max(3, 9 - (avg / 10));
+  document.getElementById("blob").style.setProperty("--bob-speed", speed + "s");
+    updateDayHint();
+}
+
+function updateFactsCounter() {
+  document.getElementById("factsCount").textContent = data.facts;
+}
+
+/* ===== Действия ===== */
+function addWater() {
+  if (data.waterDone) {
+    say("Ты уже закрыл цель по воде! Старайся сегодня больше не пить 💧", "think");
+    return;
+  }
+  data.water++;
+  const goal = Number(goals.water) || 8;
+
+  if (data.water >= goal) {
+    data.waterDone = true;
+    if (data.sleepDone) {
+      say(getDayStory(), "celebrate");
+      throwConfetti(60);
+    } else {
+      say("Цель по воде выполнена! Старайся сегодня больше не пить 💧", "happy");
+    }
+  } else if (data.water >= goal * 0.8) {
+    say("Уже почти всё! Ещё чуть-чуть.", "happy");
+  } else {
+    say("Записал стакан!", "normal");
+  }
+
+  save();
+  document.getElementById("water").textContent = data.water;
+  updateProgressBars();
+  renderWeek();
+  addMood(5);
+    if (data.waterDone) clearInterval(waterReminderTimer);
+      checkAchievements();
+  applyDoneState();
+  updateStreak();
+  resetIdle();
+}
+
+function addSleep() {
+  if (data.sleepDone) {
+    say("Норма сна уже закрыта! Старайся сегодня больше не спать 😴", "think");
+    return;
+  }
+  const hours = parseInt(document.getElementById("sleepInput").value);
+  if (isNaN(hours) || hours < 0 || hours > 24) {
+    say("Введи реальное число часов: от 0 до 24.", "think");
+    return;
+  }
+  data.sleep += hours;
+  const goal = Number(goals.sleep) || 7;
+
+  if (data.sleep >= goal) {
+    data.sleepDone = true;
+    if (data.waterDone) {
+      say(getDayStory(), "celebrate");
+      throwConfetti(60);
+    } else {
+      say("Норма сна выполнена! Старайся сегодня больше не спать 😴", "happy");
+    }
+  } else if (data.sleep >= goal * 0.7) {
+    say("Хорошо, но постарайся добрать до цели.", "sleep");
+  } else {
+    say("Записал. Постарайся добрать до 7–8 часов.", "sleep");
+  }
+
+  save();
+  document.getElementById("sleep").textContent = data.sleep;
+  updateProgressBars();
+  addMood(10);
+  applyDoneState();
+  updateStreak();
+  resetIdle();
+  document.getElementById("sleepInput").value = "";
+}
+
+/* ===== Шаги ===== */
+const STEP_PHRASES = [
+  "Ещё тысяча — ты уже на полпути!",
+  "Каждый шаг — плюс к бодрости. Записал!",
+  "Ноги гудят, а я горжусь!",
+  "Такие темпы — только в гору!"
+];
+
+function updateStepsUI() {
+  const countEl = document.getElementById("stepsCount");
+  if (!countEl) return;
+
+  const goal = Number(goals.steps) || 8000;
+  const steps = data.steps || 0;
+  const percent = Math.min(100, (steps / goal) * 100);
+
+  countEl.textContent = steps;
+  document.getElementById("stepsSub").textContent =
+    steps >= goal
+      ? "Цель выполнена — можно и отдохнуть 😌"
+      : `из ${goal} — осталось ${goal - steps}`;
+  document.getElementById("stepsPercent").textContent = Math.floor(percent) + "% цели";
+  document.getElementById("stepsDistance").textContent =
+    "≈ " + (steps * 0.00075).toFixed(2) + " км пройдено";
+
+  const bar = document.getElementById("stepsBar");
+  bar.style.width = percent + "%";
+  bar.style.background = percent >= 100
+    ? "#2ecc71"
+    : `linear-gradient(90deg, #3498db ${percent}%, #2ecc71 ${percent}%)`;
+
+  document.getElementById("stepsDoneNote").style.display = steps >= goal ? "block" : "none";
+    updateDayHint();
+}
+
+function closeStepsScreen() {
+  document.getElementById("stepsScreen").style.display = "none";
+  resetIdle();
+}
+
+function showScreen(name) {
+  document.getElementById("mainScreen").style.display = name === "main" ? "block" : "none";
+  document.getElementById("stepsScreen").style.display = name === "steps" ? "block" : "none";
+  document.getElementById("statsScreen").style.display = name === "stats" ? "block" : "none";
+  document.querySelectorAll(".nav-btn").forEach(b =>
+    b.classList.toggle("active",
+      b.dataset.screen === name || (name === "stats" && b.dataset.screen === "steps")));
+  if (name === "steps" || name === "stats") updateStepsUI();
+  window.scrollTo(0, 0);
+  resetIdle();
+}
+
+function addSteps(count) {
+  data.steps = (data.steps || 0) + count;
+  save();
+  updateStepsUI();
+  renderWeekSteps();
+
+  const goal = Number(goals.steps) || 8000;
+
+  if (data.steps >= goal) {
+    say("Ого, ты столько ходил сегодня! Ноги, наверное, гудят. Сядь, попей воды. 🎉", "celebrate");
+    data.mood = Math.min(100, (data.mood || 0) + 15);
+    save();
+    document.getElementById("moodBar").style.width = data.mood + "%";
+    throwConfetti(30);
+  } else if (data.steps >= goal * 0.7) {
+    say("Ты сегодня много двигался, это круто! Ещё чуть-чуть до цели.", "happy");
+  } else {
+    say(STEP_PHRASES[Math.floor(Math.random() * STEP_PHRASES.length)], "happy");
+  }
+}
+
+function addManualSteps() {
+  const input = document.getElementById("manualSteps");
+  const val = Number(input.value);
+  if (!val || val < 0) {
+    say("Введи положительное число, пожалуйста.", "think");
+    return;
+  }
+  addSteps(val);
+  input.value = "";
+}
+
+function resetStepsDay() {
+  if (data.steps === 0) {
+    say("Сбрасывать нечего — шагов и так ноль.", "think");
+    return;
+  }
+  data.steps = 0;
+  save();
+  updateStepsUI();
+  renderWeekSteps();
+  say("Шаги за день обнулил. Начнём заново!", "think");
+}
+
+function startWalk() {
+  if (isWalking) return;
+
+  isWalking = true;
+  startTime = Date.now();
+  totalDistance = 0;
+  lastPos = null;
+
+  document.getElementById("trackerStatus").textContent = "Ищем спутники…";
+  document.querySelector(".btn-start").style.display = "none";
+  document.querySelector(".btn-stop").style.display = "flex";
+
+  walkTimer = setInterval(updateTimer, 1000);
+
+  if (!navigator.geolocation) {
+    document.getElementById("trackerStatus").textContent = "GPS недоступен — км введёшь после «Стоп».";
+    return;
+  }
+
+  navigator.geolocation.getCurrentPosition(
+    pos => {
+      lastPos = pos.coords;
+      startTrackingLoop();
+      document.getElementById("trackerStatus").textContent = "Гуляем! 🚶 GPS следит за маршрутом.";
+    },
+    () => {
+      document.getElementById("trackerStatus").textContent = "Без GPS. Км введёшь вручную после «Стоп».";
+      say("Геолокацию не дали — не беда, после прогулки впишешь километры сам.", "think");
+    },
+    { enableHighAccuracy: true, timeout: 10000 }
+  );
+
+  say("Погнали! Просто гуляй. Когда вернёшься — скажи, сколько км прошёл.", "happy");
+}
+
+function stopWalk() {
+  isWalking = false;
+  clearInterval(walkTimer);
+  document.querySelector(".btn-start").style.display = "flex";
+  document.querySelector(".btn-stop").style.display = "none";
+
+  // >>> ВОТ СЮДА <<<
+  // Блок вставляется вместо старого кода:
+  // const input = prompt(...); if (input === null) {...} const km = parseFloat(trimmed); if (...) {...}
+  const measuredKm = totalDistance / 1000;
+  const input = measuredKm > 0.05
+    ? null
+    : prompt("Сколько примерно километров ты прошёл? (например, 2.5)");
+
+  let km;
+
+  if (input === null) {
+    if (measuredKm > 0.05) {
+      // GPS посчитал сам — вопрос не задавали, просто берём измеренное
+      km = measuredKm;
+    } else {
+      // Пользователь нажал «Отмена» и GPS ничего не мерил
+      say("Ладно, ничего не добавляем. В следующий раз скажешь про километры.", "think");
+      document.getElementById("trackerStatus").textContent = "Прогулка завершена. Шаги не добавлены.";
+      return;
+    }
+  } else {
+    km = parseFloat(input.trim());
+    if (!input.trim() || isNaN(km) || km < 0) {
+      say("Кажется, тут не совсем число. Введи, пожалуйста, просто цифры, например 2.5.", "think");
+      return;
+    }
+  }
+  // <<< КОНЕЦ ВСТАВКИ >>
+
+  const stepsAdded = Math.round(km * 1333); // 1 км ≈ 1333 шага
+  data.steps = (data.steps || 0) + stepsAdded;
+
+  const now = new Date();
+  data.walks.push({
+    km: km,
+    steps: stepsAdded,
+    date: now.toLocaleDateString("ru-RU"),
+    time: now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })
+  });
+    checkAchievements();
+  if (data.walks.length > 10) data.walks.shift();
+
+  save();
+  updateStepsUI();
+  renderWeekSteps();
+  renderWalkHistory();
+
+  say(`Пройдено ${km.toFixed(1)} км — это примерно ${stepsAdded} шагов! Молодец! 🎉`, "celebrate");
+  throwConfetti(20);
+
+  document.getElementById("trackerStatus").textContent = `Прогулка завершена. Добавлено ${stepsAdded} шагов.`;
+}
+
+function updateTimer() {
+  const now = Date.now();
+  const diff = Math.floor((now - startTime) / 1000);
+  const mins = String(Math.floor(diff / 60)).padStart(2, "0");
+  const secs = String(diff % 60).padStart(2, "0");
+  document.getElementById("trackerTime").textContent = `${mins}:${secs}`;
+}
+
+function startTrackingLoop() {
+  walkTimer = setInterval(() => {
+    if (!isWalking || !lastPos) return;
+
+    navigator.geolocation.getCurrentPosition(
+      pos => {
+        const d = distance(lastPos.latitude, lastPos.longitude, pos.coords.latitude, pos.coords.longitude);
+        totalDistance += d;
+        lastPos = pos.coords;
+
+        const km = (totalDistance / 1000).toFixed(2);
+        document.getElementById("trackerKm").textContent = km;
+        updateTimer();
+      },
+      err => console.warn("GPS error:", err),
+      { enableHighAccuracy: true, timeout: 3000, maximumAge: 0 }
+    );
+  }, 3000); // каждые 3 секунды обновляем позицию
+}
+
+// Формула гаверсинуса — считаем расстояние между двумя точками
+function distance(lat1, lon1, lat2, lon2) {
+  const R = 6371000; // радиус Земли в метрах
+  const φ1 = lat1 * Math.PI / 180;
+  const φ2 = lat2 * Math.PI / 180;
+  const Δφ = (lat2 - lat1) * Math.PI / 180;
+  const Δλ = (lon2 - lon1) * Math.PI / 180;
+
+  const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+
+/* ===== Факты сами по времени ===== */
+function tellRandomFact() {
+  const fact = FACTS[Math.floor(Math.random() * FACTS.length)];
+  data.facts++; save();
+  updateFactsCounter();
+  say(fact, "wow");
+}
+setInterval(() => {
+  if (document.visibilityState !== "visible") return;
+  const h = new Date().getHours();
+  if (h >= 22 || h < 7) return;
+  tellRandomFact();
+}, 45000);
+
+/* ===== Викторина ===== */
+function startQuiz() {
+  resetIdle();
+  const blob = document.getElementById("blob");
+  blob.style.animationPlayState = "paused";
+  blob.style.transform = "scale(1.1)";
+
+  setTimeout(() => {
+    blob.style.animationPlayState = "";
+    blob.style.transform = "";
+
+    let index;
+    do {
+      index = Math.floor(Math.random() * QUIZ.length);
+    } while (index === lastQuestionIndex && QUIZ.length > 1);
+    lastQuestionIndex = index;
+
+    const q = QUIZ[index];
+    document.getElementById("quizQuestion").textContent = q.q;
+    const box = document.getElementById("quizAnswers");
+    box.innerHTML = "";
+    const yes = document.createElement("button");
+    yes.className = "quiz-btn yes"; yes.textContent = "Правда";
+    yes.onclick = () => answer("правда");
+    const no = document.createElement("button");
+    no.className = "quiz-btn no"; no.textContent = "Миф";
+    no.onclick = () => answer("миф");
+    box.appendChild(yes); box.appendChild(no);
+    document.getElementById("quizOverlay").classList.add("open");
+
+    function answer(userAnswer) {
+      const correct = userAnswer === q.a;
+      if (correct) { throwConfetti(60); say("Молодец!", "celebrate"); addMood(15); }
+      else say("Ничего, зато узнал новое!", "think");
+      document.getElementById("quizQuestion").textContent =
+        (correct ? "✅ Верно! 🎉 " : "❌ Почти! Правильно: " + q.a + ". ") + q.e;
+      box.innerHTML = "";
+    }
+  }, 600);
+}
+
+let idleTimer;
+function resetIdle() {
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    const h = new Date().getHours();
+    if (h >= 22 || h < 7) return;
+    say("Ты тут? Скоро расскажу новый факт!", "think");
+  }, 40000);
+}
+
+function openSettings() {
+  document.getElementById("newWaterGoal").value = goals.water;
+  document.getElementById("newSleepGoal").value = goals.sleep;
+  document.getElementById("newStepsGoal").value = goals.steps;
+  document.getElementById("settingsOverlay").classList.add("open");
+  resetIdle();
+}
+
+function saveGoals() {
+  const w = parseInt(document.getElementById("newWaterGoal").value);
+  const s = parseInt(document.getElementById("newSleepGoal").value);
+  const st = parseInt(document.getElementById("newStepsGoal").value);
+
+  if (!isNaN(w) && w > 0) goals.water = w;
+  if (!isNaN(s) && s > 0) goals.sleep = s;
+  if (!isNaN(st) && st > 0) goals.steps = st;
+
+  persistGoals();
+  recalcDoneStatus();
+  renderWeek();
+  renderWeekSteps();
+  updateStepsUI();
+  updateStreak();
+  applyDoneState();
+  updateProgressBars();
+  hideCard("settingsOverlay");
+  say("Цели обновлены!", "happy");
+}
+
+function greetByTime() {
+  const h = new Date().getHours();
+  if (h >= 22 || h < 7) {
+    say("Уже поздно… Пора спать! 👋", "sleep");
+    return;
+  }
+  if (h < 11) {
+    say("Доброе утро! Стакан воды и пара тысяч шагов — и день твой ☀", "happy");
+    return;
+  }
+  if (h < 18) {
+    say("Добрый день! Как продвигается вода?", "normal");
+    return;
+  }
+  say("Добрый вечер! Что делаем сегодня?", "happy");
+}
+
+function toggleTheme() {
+  if (document.body.dataset.theme === "dark") {
+    document.body.removeAttribute("data-theme");
+    localStorage.setItem("healthTheme", "day");
+    document.getElementById("themeBtn").textContent = "🌙";
+    say("Светло!", "happy");
+  } else {
+    document.body.dataset.theme = "dark";
+    localStorage.setItem("healthTheme", "dark");
+    document.getElementById("themeBtn").textContent = "☀️";
+    say("Ночь, темень, лес дорожный…", "sleep");
+  }
+}
+
+/* ===== Мини-блоб при скролле ===== */
+const miniBlob = document.getElementById("miniBlob");
+const charObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    miniBlob.classList.toggle("visible", !entry.isIntersecting);
+  });
+}, { threshold: 0 });
+charObserver.observe(document.getElementById("charBlock"));
+
+function scrollToChar() {
+  document.getElementById("charBlock").scrollIntoView({ behavior: "smooth" });
+}
+
+/* ===== Глаза следят за курсором ===== */
+const pupilLeft = document.querySelector(".eye.left .pupil");
+const pupilRight = document.querySelector(".eye.right .pupil");
+
+document.addEventListener("mousemove", (e) => {
+  const rect = document.getElementById("blob").getBoundingClientRect();
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+
+  const dx = e.clientX - centerX;
+  const dy = e.clientY - centerY;
+
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return;
+
+  const maxShift = 3;
+  const px = (dx / dist) * maxShift;
+  const py = (dy / dist) * maxShift;
+
+  pupilLeft.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+  pupilRight.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+});
+
+/* ===== Инициализация ===== */
+if (localStorage.getItem("healthTheme") === "dark") {
+  document.body.dataset.theme = "dark";
+  document.getElementById("themeBtn").textContent = "☀️";
+}
+rolloverIfNeeded();
+recalcDoneStatus();
+// Сначала считаем, сколько набежало сегодня
+
+const now = new Date();
+const todayString = now.toLocaleDateString('ru-RU');
+
+// Проверяем, хвалили ли уже сегодня
+const lastPraisedDate = localStorage.getItem('lastPraisedDate');
+const alreadyPraisedToday = lastPraisedDate === todayString;
+
+const todayKm = getTodayTotalKm();
+
+if (!alreadyPraisedToday && todayKm >= 5) {
+  // Хвалим только если сегодня ещё не хвалили И набежало 5+ км
+  say(`Ого, ${todayKm.toFixed(1)} км за сегодня! Ты просто марафонец! Горжусь тобой 🦸‍♂️`, 'celebrate');
+  throwConfetti(30); // если есть функция конфетти
+  localStorage.setItem('lastPraisedDate', todayString); // запоминаем, что похвалили
+} else if (todayKm < 5 || alreadyPraisedToday) {
+  // Обычное приветствие, если мало км или уже хвалили
+  greetByTime();
+}
+
+document.getElementById("water").textContent = data.water;
+document.getElementById("sleep").textContent = data.sleep;
+document.getElementById("moodBar").style.width = (data.mood || 0) + "%";
+applyDoneState();
+updateProgressBars();
+updateFactsCounter();
+renderWeek();
+renderWeekSteps();
+updateStepsUI();
+renderWalkHistory();
+updateStreak();
+resetIdle();
+showScreen("main");
+if ("Notification" in window && Notification.permission === "default" && data.water >= 1) {
+  Notification.requestPermission();
+}
+startWaterReminders();
+eveningSleepReminder();
+
+/* ===== Напоминания о воде ===== */
+function waterReminder() {
+  const h = new Date().getHours();
+  if (h >= 22 || h < 8) return;
+  if (document.visibilityState !== "visible") return;
+  if (data.waterDone) return;
+
+  const wGoal = Number(goals.water) || 8;
+  const left = wGoal - data.water;
+
+  const msg = left === 1
+    ? "Остался один стакан до цели! Давай добьём 💧"
+    : `Нужно ещё ${left} стакана воды. Начни с одного! 💧`;
+
+  say(msg, "happy");
+  notifyIfAllowed("Здоровье-бот", msg);
+}
+
+function notifyIfAllowed(title, text) {
+  if (("Notification" in window) && Notification.permission === "granted") {
+    try { new Notification(title, { body: text }); } catch (e) {}
+  }
+}
+
+function startWaterReminders() {
+  clearInterval(waterReminderTimer);
+  waterReminderTimer = setInterval(waterReminder, REMIND_INTERVAL_MIN * 60000);
+}
+
+/* ===== Достижения ===== */
+const totalWalkKm = () => (data.walks || []).reduce((s, w) => s + (w.km || 0), 0);
+
+const achievementsList = [
+  { id: "streak3",    title: "Огонёк разгорается 🔥", check: () => data.streak >= 3,    msg: "3 дня подряд — ты втянулся в ритм!" },
+  { id: "streak7",    title: "Неделя огня 🔥🔥",      check: () => data.streak >= 7,    msg: "Целая неделя без пропусков!" },
+  { id: "waterFirst", title: "Первый заплыв 💧",      check: () => data.waterDone === true, msg: "Впервые закрыл норму воды!" },
+  { id: "steps10k",   title: "10 тысяч шагов 🚶",     check: () => data.steps >= 10000, msg: "Десять тысяч шагов за день — серьёзно!" },
+  { id: "km10",       title: "Десять километров 🗺️",  check: () => totalWalkKm() >= 10, msg: "Суммарно 10 км прогулок! Маленький марафон." }
+];
+
+function checkAchievements() {
+  for (const a of achievementsList) {
+    if (!achievements.includes(a.id) && a.check()) {
+      achievements.push(a.id);
+      saveAchievements();
+      say("🏆 Новое достижение: " + a.title + "! " + a.msg, "happy");
+      renderAchievements();
+      return;
+    }
+  }
+}
+
+function openAchievements() {
+  renderAchievements();
+  document.getElementById("achievementsOverlay").classList.add("open");
+  resetIdle();
+}
+
+function renderAchievements() {
+  const box = document.getElementById("achievementsBox");
+  if (!box) return;
+  box.innerHTML = "";
+
+  const grid = document.createElement("div");
+  grid.style.cssText = "display:flex; flex-wrap:wrap; gap:10px;";
+
+  achievementsList.forEach(a => {
+    const done = achievements.includes(a.id);
+    const card = document.createElement("div");
+    card.style.cssText = `
+      width:calc(50% - 5px);
+      box-sizing:border-box;
+      border-radius:12px;
+      padding:12px 10px;
+      text-align:center;
+      border:1px solid ${done ? "var(--accent, #e76f51)" : "var(--divider)"};
+      background:${done ? "rgba(231,111,81,0.12)" : "transparent"};
+      opacity:${done ? "1" : "0.45"};
+    `;
+    card.innerHTML = `
+      <div style="font-size:26px; line-height:1;">${done ? "🏆" : "🔒"}</div>
+      <div style="font-size:13px; font-weight:600; margin-top:6px;">${a.title}</div>
+      <div style="font-size:11px; color:var(--muted); margin-top:3px;">${done ? "Получено" : "Ещё не открыто"}</div>
+    `;
+    grid.appendChild(card);
+  });
+
+  box.appendChild(grid);
+}
+
+function getTodayTotalKm() {
+  const now = new Date();
+  const todayString = now.toLocaleDateString('ru-RU');
+  
+  if (!data.walks || data.walks.length === 0) return 0;
+
+  let total = 0;
+  for (const walk of data.walks) {
+    if (walk.date === todayString) {
+      total += walk.km;
+    }
+  }
+  return total;
+}
+
+/* ===== Вечернее напоминание про сон ===== */
+function eveningSleepReminder() {
+  const h = new Date().getHours();
+  if (h < 21 || h >= 23) return;
+  if (data.sleepDone) return;
+  const today = todayKey();
+  if (localStorage.getItem("lastSleepReminder") === today) return;
+  localStorage.setItem("lastSleepReminder", today);
+
+  const sGoal = Number(goals.sleep) || 7;
+  const msg = (data.sleep || 0) > 0
+    ? `Уже вечер. Записано ${data.sleep} ч сна из ${sGoal} — если хочешь добрать, самое время ложиться пораньше 🌙`
+    : "Уже вечер, а сон ещё не записан. Ложись пораньше — ты-из-завтра скажет спасибо 🌙";
+  say(msg, "sleepy");
+}
+setInterval(eveningSleepReminder, 60 * 1000);
+
+/* ===== Бэкап данных ===== */
+function exportData() {
+  const blob = new Blob([JSON.stringify({ healthData: data, healthGoals: goals }, null, 2)],
+    { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "health-backup-" + todayKey() + ".json";
+  a.click();
+  say("Файл скачан. Храни его в надёжном месте!", "happy");
+}
+
+function importData(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const backup = JSON.parse(reader.result);
+      if (!backup.healthData) throw new Error("bad format");
+      data = backup.healthData;
+      goals = backup.healthGoals || goals;
+      save();
+      persistGoals();
+      location.reload();
+    } catch {
+      say("Файл не похож на мой бэкап… Проверь, тот ли это файл.", "think");
+    }
+  };
+  reader.readAsText(file);
+}
+
+checkAchievements();
+renderAchievements();
+
+</script>
+
+</body>
+</html>
